@@ -63,6 +63,14 @@ def tf_computation_serializer(parameter_type: Optional[computation_types.Type],
   if parameter_type is not None:
     py_typecheck.check_type(parameter_type, computation_types.Type)
 
+  # Explicitly turn turn off grappler.
+  # The cost of grappler is almost never worth it for the shortlived graphs in
+  # federated computations. Store the previous values so the can be restored
+  # once were done tracing and we can return the global config to the previous
+  # state.
+  tf_experimental_options = tf.config.optimizer.get_experimental_options()
+  tf.config.optimizer.set_experimental_options({'disable_meta_optimizer': True})
+
   with tf.Graph().as_default() as graph:
     if parameter_type is not None:
       parameter_value, parameter_binding = tensorflow_utils.stamp_parameter_in_graph(
@@ -102,6 +110,9 @@ def tf_computation_serializer(parameter_type: Optional[computation_types.Type],
 
     result_type, result_binding = tensorflow_utils.capture_result_from_graph(
         result, graph)
+
+  # Restore the previous global state values.
+  tf.config.optimizer.set_experimental_options(tf_experimental_options)
 
   type_signature = computation_types.FunctionType(parameter_type, result_type)
 
